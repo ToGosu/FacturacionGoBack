@@ -1,0 +1,36 @@
+# Configuración de golangci-lint v2, compartida por todos los módulos
+# (golangci-lint busca este archivo subiendo desde el directorio del módulo).
+version: "2"
+
+linters:
+  # standard = errcheck, govet, ineffassign, staticcheck, unused
+  default: standard
+  enable:
+    - bodyclose     # cuerpos de respuesta HTTP sin cerrar
+    - errorlint     # comparar errores con errors.Is/As y envolver con %w
+    - gosec         # problemas de seguridad comunes
+    - noctx         # peticiones HTTP/SQL sin context.Context
+    - revive        # estilo idiomático de Go
+    - rowserrcheck  # rows.Err() sin revisar
+    - sqlclosecheck # rows/statements sin cerrar
+    - unconvert     # conversiones de tipo innecesarias
+    - unparam       # parámetros que nunca cambian
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      # En las pruebas se permiten atajos que no queremos en producción.
+      - path: _test\.go
+        linters:
+          - gosec
+          - unparam
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      # Agrupa los imports propios del repo después de los de terceros.
+      local-prefixes:
+        - github.com/ToGosu/FacturacionGoBack
