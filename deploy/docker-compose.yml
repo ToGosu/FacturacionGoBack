@@ -1,0 +1,58 @@
+# Infraestructura de desarrollo local.
+# Los servicios Go se agregan aquí a medida que se construyen (cada uno con su Dockerfile).
+#
+# Las contraseñas NO tienen valor por defecto: compose falla si faltan. Antes de
+# levantar, copia .env.example a .env en la raíz del repo y complétalas
+# (el Makefile lo pasa con --env-file). Los puertos sí tienen valor por defecto.
+
+name: panaderia
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
+      # Una base y un usuario por servicio (ADR-0006). Los crea init/01-bases.sh.
+      DB_PASSWORD_IDENTIDAD: ${DB_PASSWORD_IDENTIDAD:?define DB_PASSWORD_IDENTIDAD en .env}
+      DB_PASSWORD_PRODUCTOS_INVENTARIO: ${DB_PASSWORD_PRODUCTOS_INVENTARIO:?define DB_PASSWORD_PRODUCTOS_INVENTARIO en .env}
+      DB_PASSWORD_VENTAS: ${DB_PASSWORD_VENTAS:?define DB_PASSWORD_VENTAS en .env}
+      DB_PASSWORD_NOTIFICACIONES: ${DB_PASSWORD_NOTIFICACIONES:?define DB_PASSWORD_NOTIFICACIONES en .env}
+      DB_PASSWORD_REPORTES: ${DB_PASSWORD_REPORTES:?define DB_PASSWORD_REPORTES en .env}
+    ports:
+      # 5433 en el host para no chocar con un PostgreSQL instalado localmente.
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  nats:
+    image: nats:2.11-alpine
+    # -js activa JetStream (ADR-0003); -sd guarda los streams en el volumen; -m expone el monitoreo.
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports:
+      - "${NATS_HOST_PORT:-4222}:4222"
+      - "${NATS_MONITOR_HOST_PORT:-8222}:8222"
+    volumes:
+      - nats-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8222/healthz?js-enabled-only=true"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mailpit:
+    # SMTP de pruebas: captura los correos y los muestra en http://localhost:8025
+    image: axllent/mailpit:v1.27
+    ports:
+      - "${SMTP_HOST_PORT:-1025}:1025"
+      - "${MAILPIT_UI_HOST_PORT:-8025}:8025"
+
+volumes:
+  postgres-data:
+  nats-data:
