@@ -1,0 +1,6 @@
+# Fin de línea LF en el repositorio, sin importar el sistema operativo.
+# Evita diffs falsos entre Windows y Linux y scripts rotos dentro de Docker.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary

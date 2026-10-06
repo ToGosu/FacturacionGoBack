@@ -1,0 +1,21 @@
+# Binarios y artefactos de compilación
+/bin/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Variables de entorno locales (nunca se suben)
+.env
+.env.*
+!.env.example
+
+# go.work.sum es local de cada máquina
+go.work.sum
+
+# Editores y sistema operativo
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
