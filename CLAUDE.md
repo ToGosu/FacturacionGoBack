@@ -4,7 +4,7 @@ Guía para Claude Code al trabajar en este repositorio. Léela completa antes de
 
 ## 1. Contexto del proyecto
 
-- **Dominio:** facturación e inventario para una panadería (catálogo, inventario, facturación, clientes, notificaciones).
+- **Dominio:** facturación e inventario para una panadería (catálogo, inventario, clientes, facturación, encargos, notificaciones, reportes).
 - **Propósito:** proyecto de portafolio para demostrar dominio de Go en backend. La calidad del código, la documentación y el historial de Git **son parte del entregable**.
 - **Arquitectura:** microservicios donde se justifique, cada uno con **arquitectura hexagonal** (puertos y adaptadores) por dentro. No todo tiene que ser un microservicio: si una funcionalidad no justifica un servicio propio, se propone como módulo dentro de uno existente y se registra la decisión en un ADR.
 - **Orden de trabajo:** primero backend (lógica de negocio); el frontend viene después.
@@ -38,19 +38,19 @@ Formato: `<tipo>/<servicio>-<descripcion-corta>` en minúsculas y con guiones.
 
 | Tipo | Cuándo | Ejemplo |
 |---|---|---|
-| `feature/` | Módulo o funcionalidad nueva | `feature/catalogo-crud-productos`, `feature/inventario-reserva-stock` |
-| `fix/` | Corrección de un bug | `fix/facturacion-calculo-iva` |
-| `refactor/` | Cambio interno sin alterar comportamiento | `refactor/inventario-repositorio-sqlc` |
-| `docs/` | Documentación, ADRs, diagramas | `docs/adr-003-mensajeria` |
-| `chore/` | Infraestructura, CI, Docker, dependencias | `chore/ci-golangci-lint` |
-| `test/` | Solo pruebas | `test/facturacion-casos-anulacion` |
+| `feature/` | Módulo o funcionalidad nueva | `feature/productos-inventario-catalogo-crud`, `feature/productos-inventario-reserva-stock` |
+| `fix/` | Corrección de un bug | `fix/ventas-calculo-iva` |
+| `refactor/` | Cambio interno sin alterar comportamiento | `refactor/productos-inventario-repositorio-sqlc` |
+| `docs/` | Documentación, ADRs, diagramas | `docs/adr-0012-mensajeria` |
+| `chore/` | Infraestructura, CI, Docker, dependencias | `chore/infra-ci-golangci-lint` |
+| `test/` | Solo pruebas | `test/ventas-casos-anulacion` |
 | `hotfix/` | Arreglo urgente sobre `main` | `hotfix/gateway-cors` |
 
-Servicios válidos para el nombre: `catalogo`, `inventario`, `facturacion`, `clientes`, `notificaciones`, `gateway`, `shared` (código común), `infra`.
+Servicios válidos para el nombre (ADR-0001): `gateway` (incluye identidad), `productos-inventario`, `ventas`, `notificaciones`, `reportes`, `shared` (código común en `pkg/`), `infra`. Cuando ayude, se agrega el módulo interno después del servicio: `feature/ventas-pedidos-anticipos`.
 
 ### Granularidad
 
-- Una rama = una funcionalidad coherente y revisable (idealmente < 400 líneas de cambio). Si un servicio es grande, divídelo: `feature/facturacion-dominio`, `feature/facturacion-api-rest`, `feature/facturacion-publicar-eventos`.
+- Una rama = una funcionalidad coherente y revisable (idealmente < 400 líneas de cambio). Si un servicio es grande, divídelo: `feature/ventas-facturacion-dominio`, `feature/ventas-facturacion-api-rest`, `feature/ventas-facturacion-publicar-eventos`.
 - No mezcles en una rama cambios de varios servicios, salvo que la funcionalidad lo exija (p. ej. un contrato de evento compartido); en ese caso, explícalo en el PR.
 
 ### Commits
@@ -83,46 +83,54 @@ docs(adr): registrar decisión de usar NATS
 ├── CLAUDE.md
 ├── README.md
 ├── docs/
-│   ├── requerimientos/        # SRS, historias de usuario, glosario
-│   ├── arquitectura/          # diagramas C4
+│   ├── requerimientos/        # requerimientos v1.0 (fuente de verdad) y cuestionario
+│   ├── arquitectura/          # arquitectura (C4, flujos) y modelo de datos
 │   ├── adr/                   # 0001-titulo.md, 0002-...
-│   └── api/                   # OpenAPI (.yaml) y .proto
-├── services/
-│   ├── catalogo/
-│   ├── inventario/
-│   ├── facturacion/
-│   ├── clientes/
+│   └── api/                   # contratos de eventos y OpenAPI (.yaml) por servicio
+├── services/                  # los 5 servicios de ADR-0001
+│   ├── gateway/               # módulos: identidad, gateway
+│   ├── productos-inventario/  # módulos: catalogo, inventario
+│   ├── ventas/                # módulos: clientes, facturacion, pedidos
 │   ├── notificaciones/
-│   └── gateway/
-├── pkg/                       # código compartido mínimo (logger, errores, middleware)
-├── deploy/                    # docker-compose, prometheus, grafana, k8s (opcional)
-└── .github/workflows/         # CI
+│   └── reportes/
+├── pkg/                       # utilidades SIN dominio: logging, config, httpx, natsx, outbox
+├── deploy/                    # docker-compose, init de Postgres, NATS, observabilidad
+├── .github/workflows/         # CI
+├── go.work                    # une los módulos para desarrollo local
+└── Makefile
 ```
+
+Ruta de módulo Go: `github.com/ToGosu/FacturacionGoBack/services/<servicio>` (y `.../pkg` para el código común).
 
 ### Estructura interna de cada servicio (hexagonal)
 
+Cada servicio agrupa uno o más **módulos** (bounded contexts). Cada módulo tiene su propio hexágono:
+
 ```
 services/<servicio>/
-├── cmd/<servicio>/main.go     # composición: conecta adaptadores con puertos
+├── cmd/<servicio>/main.go     # composición: conecta adaptadores con puertos; graceful shutdown
 ├── internal/
-│   ├── domain/                # entidades, value objects, reglas de negocio, errores de dominio
-│   ├── application/           # casos de uso; define los PUERTOS (interfaces)
-│   ├── adapters/
-│   │   ├── http/              # handlers REST (adaptador de entrada)
-│   │   ├── messaging/         # publicadores/consumidores de eventos
-│   │   └── postgres/          # repositorios (adaptador de salida)
-│   └── config/
-├── migrations/                # migraciones SQL versionadas
+│   ├── <modulo>/              # p. ej. catalogo, inventario
+│   │   ├── domain/            # entidades, value objects, reglas de negocio, errores de dominio
+│   │   ├── app/               # casos de uso; define los PUERTOS (interfaces)
+│   │   └── adapters/
+│   │       ├── http/          # handlers REST con chi (adaptador de entrada)
+│   │       ├── nats/          # publicadores/consumidores de eventos
+│   │       └── postgres/      # repositorios con sqlc + pgx (adaptador de salida)
+│   └── platform/              # transversal del servicio: config, auth, outbox, auditoría
+├── migrations/                # migraciones SQL versionadas (golang-migrate)
+├── api/openapi.yaml           # contrato del servicio (contract-first)
 ├── Dockerfile
-├── Makefile
 └── go.mod                     # un módulo Go por servicio
 ```
+
+Los módulos de un mismo servicio se hablan a través de interfaces, nunca tocando las tablas del otro, para poder separarlos después (ADR-0001). `catalogo`, `clientes` y `notificaciones` pueden ser más planos (casi CRUD) sin romper la regla de dependencias (ADR-0002).
 
 **Reglas de dependencia (no negociables):**
 
 - `domain` no importa nada del proyecto ni librerías de infraestructura (ni HTTP, ni SQL, ni JSON tags si se puede evitar).
-- `application` depende solo de `domain` y declara las interfaces (puertos) que necesita.
-- `adapters` implementan esos puertos y dependen de `application`/`domain`, nunca al revés.
+- `app` depende solo de `domain` y declara las interfaces (puertos) que necesita.
+- `adapters` implementan esos puertos y dependen de `app`/`domain`, nunca al revés.
 - Las interfaces se definen **donde se consumen**, no donde se implementan (idioma de Go).
 - Ningún servicio accede a la base de datos de otro (database-per-service). La comunicación es por API o eventos.
 
@@ -130,8 +138,9 @@ services/<servicio>/
 
 - **Go:** versión estable más reciente declarada en `go.mod`. Formato con `gofmt`/`goimports`.
 - **HTTP:** `chi` (preferido por ser cercano a `net/http`). No mezclar routers entre servicios.
-- **Base de datos:** PostgreSQL. Migraciones con `golang-migrate`. Acceso con `sqlc` o `pgx`; si se elige GORM, registrarlo en un ADR.
-- **Mensajería:** NATS o Kafka — **decisión pendiente de ADR**. No asumas una; si la tarea lo requiere y no existe el ADR, pregunta.
+- **Base de datos:** PostgreSQL, una instancia con una base y un usuario por servicio. Migraciones con `golang-migrate`. Acceso con `sqlc` + `pgx` (ADR-0006).
+- **Mensajería:** NATS JetStream (ADR-0003), detrás de puertos para no acoplar el dominio al broker. Outbox transaccional y consumidores idempotentes (ADR-0005).
+- **Autenticación:** JWT con firma asimétrica verificado por cada servicio (ADR-0008).
 - **Logs:** `log/slog` (estructurado, JSON). Nunca `fmt.Println` en código de producción.
 - **Configuración:** variables de entorno; nada de credenciales en el código. Mantén un `.env.example` actualizado; `.env` va en `.gitignore`.
 - **Testing:** `testing` + `testify`. Tests de tabla para reglas de dominio. Tests de integración con Postgres real vía `testcontainers-go` o docker compose.
@@ -143,11 +152,11 @@ services/<servicio>/
 - Sin `panic` para flujo normal; solo para errores irrecuperables en arranque.
 - Toda goroutine debe tener un mecanismo claro de finalización (context, `WaitGroup`, `errgroup`). Apagado ordenado (graceful shutdown) en cada `main.go`.
 - Nombres en Go idiomático (`ProductoID`, no `productoId`); identificadores de dominio en español, términos técnicos de Go en inglés está bien.
-- Dinero: nunca `float64`. Usar enteros en centavos (`int64`) o un tipo decimal, y documentar la elección.
+- Dinero: nunca `float64`. Enteros en centavos (`int64`), cantidades en milésimas y tarifas en puntos básicos; el IVA viene incluido en el precio (ADR-0007).
 
 ## 5. Reglas de negocio y contratos
 
-- Los requerimientos aprobados (v1.0) en `docs/requerimientos/` son la fuente de verdad. Si una tarea contradice o no está cubierta por ellos, **detente y pregunta**; no inventes reglas de negocio.
+- Los requerimientos aprobados (`docs/requerimientos/requerimientos-v1.0.md`) son la fuente de verdad; los ADRs de `docs/adr/` prevalecen sobre este archivo si hubiera diferencias. Si una tarea contradice o no está cubierta por ellos, **detente y pregunta**; no inventes reglas de negocio.
 - Toda API nueva o modificada se documenta primero en `docs/api/` (contract-first) y luego se implementa.
 - Los eventos (p. ej. `FacturaEmitida`, `StockBajo`) tienen esquema versionado y documentado. Los consumidores deben ser **idempotentes**.
 - Cambios de esquema de BD solo mediante una migración nueva; nunca editar una migración ya aplicada en `develop`.
@@ -171,13 +180,13 @@ Toda decisión con alternativas reales (broker de mensajería, ORM vs SQL tipado
 ## 8. Comandos útiles
 
 ```bash
-make run SERVICE=catalogo        # levantar un servicio
+make run SERVICE=productos-inventario  # levantar un servicio
 make test                        # tests de todos los servicios
 make lint                        # golangci-lint
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-(Si el `Makefile` aún no existe, créalo en una rama `chore/makefile-base` antes de depender de él.)
+(Si el `Makefile` aún no existe, créalo en una rama `chore/infra-...` antes de depender de él.)
 
 ## 9. Cómo debe trabajar Claude en este repo
 
