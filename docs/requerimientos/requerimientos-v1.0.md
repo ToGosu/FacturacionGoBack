@@ -5,7 +5,7 @@
 | **Versión** | 1.0 |
 | **Fecha** | 5 de octubre de 2026 |
 | **Autor** | Santiago Torres Castaño |
-| **Estado** | Aprobado; decisiones de la sección 10 cerradas (queda una menor abierta: D-12) |
+| **Estado** | Aprobado; decisiones de la sección 10 cerradas |
 | **Fuente** | Cuestionario de requerimientos respondido (las referencias `[Q#.#]` apuntan a la pregunta de origen) |
 
 ---
@@ -107,7 +107,7 @@ Cada módulo es dueño de sus datos y los demás solo acceden a ellos mediante s
 **Catálogo e inventario**
 - **RN-01** Existe un único inventario (una sede).
 - **RN-02** Hay dos tipos de ítem: `PRODUCTO_VENDIBLE` (entra por producción propia) y `MATERIA_PRIMA` (entra por compra). Solo los productos vendibles se facturan. [Q3.1, Q4.1]
-- **RN-03** Los ítems son unidades simples con unidad de medida (und, kg, g, l…), sin variantes. [Q3.2]
+- **RN-03** Los ítems son unidades simples con unidad de medida (und, kg, g, l…), sin variantes. Los productos vendibles se cuentan en unidades enteras; la materia prima admite decimales (D-13). [Q3.2]
 - **RN-04** Los precios cambian en el tiempo y se conserva su historial. Cada línea de factura guarda el precio vigente **al momento de la venta**, de modo que un cambio posterior no altera facturas pasadas. [Q3.3]
 - **RN-05** Stock disponible = stock físico − stock reservado.
 - **RN-06** Cada ítem tiene un stock mínimo. Cuando el disponible baja de ese umbral se genera **una** alerta (no una por cada venta posterior). [Q4.5]
@@ -297,12 +297,12 @@ Las decisiones del borrador 0.1 se resolvieron el 5 de octubre de 2026.
 | D-09 | Cuentas por cobrar | Facturas emitidas con saldo pendiente |
 | D-10 | Devoluciones | Se decide por línea en la nota crédito: reingresa o merma |
 | D-11 | Estado borrador/pendiente | Se trata como `BORRADOR`, sin efecto en stock |
+| D-12 | Cancelación de un encargo que ya tiene anticipos | El admin decide al cancelar si devuelve todo, una parte o retiene, con motivo y auditoría (RN-24). *(Aprobada el 6 de octubre de 2026)* |
+| D-13 | Unidades (precisa RN-03) | Los productos vendibles se cuentan en **unidades enteras** (unidad fija `und`). La materia prima se mide por peso o volumen con decimales (`kg`, `g`, `l`, `ml`) o en `und` cuando se cuenta (p. ej. huevos). Lista cerrada de unidades. *(6 de octubre de 2026)* |
+| D-14 | Tarifas de IVA permitidas | Solo **0 %, 5 % y 19 %** (tarifas vigentes en Colombia). Aplica solo a productos vendibles. *(6 de octubre de 2026)* |
+| D-15 | Precio de la materia prima | La materia prima **no tiene precio** ni historial de precios; solo los productos vendibles (precisa RF-CAT-01). *(6 de octubre de 2026)* |
+| D-16 | Vigencia de un precio nuevo | Rige **desde el momento en que se registra** y cierra el anterior; no hay precios programados a futuro. *(6 de octubre de 2026)* |
 
-**Decisión menor abierta**
-
-| ID | Tema | Propuesta (se asume si no se responde) |
-|---|---|---|
-| D-12 | Cancelación de un encargo que ya tiene anticipos | El admin decide al cancelar si devuelve todo, una parte o retiene, con motivo y auditoría (RN-24) |
 
 **Pendiente para la Fase 2:** agrupación de los 8 módulos en servicios desplegables (ADR).
 
